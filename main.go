@@ -7,29 +7,32 @@ import (
 	"strconv"
 )
 
-// Operations use the first 3 bits as the Op Code. The last 5 bits are Op specific
+// Operations use the first 4 bits as the Op Code. The last 4 bits are operation specific.
 const (
 	// 8 7 6 5 4 3 2 1
 	// 0 0 0 0 _ _ _ _
-	// Adds values of Register A and Register B together and stores them in Register B
+	// Adds values of Register A and Register B together and stores them in Register B.
+	// TODO: use LSBs to control which register the sum goes in
 	opAdd byte = 0
 	// 8 7 6 5 4 3 2 1
 	// 0 0 0 1 V A L U
-	// Loads V A L U into register A
+	// Loads V A L U into register A.
 	opLoadA byte = 1
 	// 8 7 6 5 4 3 2 1
 	// 0 0 1 0 V A L U
-	// Loads V A L U into register B
+	// Loads V A L U into register B.
 	opLoadB byte = 2
 	// 8 7 6 5 4 3 2 1
 	// 0 0 1 1 _ _ _ _
-	// Halt the program
+	// Halt the program.
 	opHalt byte = 3
 )
 
+// Useful for clearing the op code from an instruction.
 const msbMask = 0xF0 // 11110000
 
 var (
+	// TODO: use array for registers
 	registerA byte
 	registerB byte
 
@@ -38,26 +41,31 @@ var (
 	pc byte
 )
 
+// convert a byte to a binary string representation
 func byteToString(b byte) string {
 	return fmt.Sprintf("%08b", b)
 }
 
+// convert a string containing binary into a byte
 func stringToByte(s string) byte {
 	b, err := strconv.ParseUint(s, 2, 8)
 	if err != nil {
-		panic(fmt.Sprintf("Invalid byte in string '%v': %v", s, err))
+		panic(fmt.Sprintf("Invalid binary sequence in string '%v': %v", s, err))
 	}
 	return byte(b)
 }
 
-func isBitSet(b byte, pos uint8) bool {
-	return (b & (1 << pos)) > 0
+// determines if the n-th bit (from the right) is set
+func isBitSet(b byte, n uint8) bool {
+	return (b & (1 << n)) > 0
 }
 
+// sets the first 4 (MSB) bits to 0
 func clearMsb(b byte) byte {
 	return b &^ msbMask
 }
 
+// prints the current state of the VM
 func printState() {
 	fmt.Printf("Register A: %s (%d)\n", byteToString(registerA), registerA)
 	fmt.Printf("Register B: %s (%d)\n", byteToString(registerB), registerB)
@@ -65,6 +73,7 @@ func printState() {
 }
 
 func main() {
+	// sample program that does 2 sums
 	ram[0] = stringToByte("00010011") // LOAD A 0011 (3)
 	ram[1] = stringToByte("00100100") // LOAD B 0100 (4)
 	ram[2] = stringToByte("00000000") // SUM
@@ -87,19 +96,15 @@ func main() {
 		doExit := false
 		switch opCode {
 		case opLoadA:
-			fmt.Println("Executing LOAD A")
 			registerA = clearMsb(instruction)
 
 		case opLoadB:
-			fmt.Println("Executing LOAD B")
 			registerB = clearMsb(instruction)
 
 		case opAdd:
-			fmt.Println("Executing ADD")
 			registerB = registerA + registerB
 
 		case opHalt:
-			fmt.Println("Executing HALT")
 			doExit = true
 
 		default:
