@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
-	"os/exec"
 	"strconv"
+	"strings"
 )
 
 // opCodeDescriptor describe a Hopper OPCODE. It holds information for the Hopper assembler to know
@@ -12,13 +13,15 @@ import (
 type opCodeDescriptor struct {
 	// The string (or ASM) version of this OPCODE.
 	asm string
+	// The OPCODE. This will not be populated in the opCodes, only in the assembling stage.
+	opCode byte
 	// Indicates wether this OPCODE has any operands.
 	noOperand bool
 	// The function that will execute the OPCODE.
 	executor func(operand byte) (result byte, exitVM bool, incrementPC bool)
 }
 
-// opCodes holds all supported OPCODEs in Hopper VM.
+// opCodes holds all supported OPCODEs in Hopper VM. The key is the OPCODE's binary representation.
 var opCodes = map[byte]opCodeDescriptor{
 	0: opCodeDescriptor{
 		asm:       "NOOP",
@@ -72,20 +75,13 @@ var opCodes = map[byte]opCodeDescriptor{
 }
 
 /*
-TODO: Possible instructions (* already implemented)
-NOOP*
-LOAD A ADDR*
-LOAD B ADDR*
+TODO: Possible future instructions
 SAVE A ADDR
 SAVE B ADDR
 ADD  ADDR ; Add ADDR=A+B
-SUB  ADDR ; Subtract ADDR=A-B*
 JMP  ADDR ; Jump to ADDR
 JMPZ ADDR ; Jump to ADDR if flagRegister is zero
-JMPP ADDR ; Jump to ADDR if flagRegister is positive*
 JMPN ADDR ; Jump to ADDR if flagRegister is negative
-INC  ADDR*
-HALT*
 */
 
 // Flags for the flagRegister.
@@ -94,9 +90,6 @@ const (
 	flagPositive = 1
 	flagNegative = 2
 )
-
-// Useful for clearing the op code from an instruction.
-const msbMask = 0xF0 // 11110000
 
 var (
 	// Two general purpose registers.
@@ -110,76 +103,7 @@ var (
 	pc byte
 )
 
-// convert a byte to a binary string representation
-func byteToString(b byte) string {
-	return fmt.Sprintf("%08b", b)
-}
-
-// convert half a byte to a binary string representation
-func byteToNibble(b byte) string {
-	return fmt.Sprintf("%04b", b)
-}
-
-// convert a string containing binary into a byte
-func stringToByte(s string) byte {
-	b, err := strconv.ParseUint(s, 2, 8)
-	if err != nil {
-		panic(fmt.Sprintf("Invalid binary sequence in string '%v': %v", s, err))
-	}
-	return byte(b)
-}
-
-// determines if the n-th bit (from the right) is set
-func isBitSet(b byte, n uint8) bool {
-	return (b & (1 << n)) > 0
-}
-
-// sets the first 4 (MSB) bits to 0
-func clearMsb(b byte) byte {
-	return b &^ msbMask
-}
-
-// prints the current state of the VM
-func printState() {
-	fmt.Printf("Register A:    %s (%d)\n", byteToString(registerA), registerA)
-	fmt.Printf("Register B:    %s (%d)\n", byteToString(registerB), registerB)
-	fmt.Printf("Flag Register: %s (%d)\n", byteToString(flagRegister), flagRegister)
-	fmt.Printf("PC:            %s (%d)\n", byteToString(pc), pc)
-	fmt.Println("RAM:")
-	for addr, val := range ram {
-		pcIndicator := ""
-		if byte(addr) == pc {
-			pcIndicator = " <---"
-		}
-		fmt.Printf(
-			"%02d: %s: %s%s\n",
-			addr+1,
-			byteToNibble(byte(addr)),
-			byteToString(val),
-			pcIndicator,
-		)
-	}
-}
-
-func main() {
-	// the count_to_three.hop
-	ram[0] = stringToByte("00111100")
-	ram[1] = stringToByte("00011101")
-	ram[2] = stringToByte("00101100")
-	ram[3] = stringToByte("01001110")
-	ram[4] = stringToByte("01010000")
-	ram[5] = stringToByte("01100000")
-	ram[6] = stringToByte("00000000")
-	ram[7] = stringToByte("00000000")
-	ram[8] = stringToByte("00000000")
-	ram[9] = stringToByte("00000000")
-	ram[10] = stringToByte("00000000")
-	ram[11] = stringToByte("00000000")
-	ram[12] = stringToByte("00000000")
-	ram[13] = stringToByte("00000011")
-	ram[14] = stringToByte("00000000")
-	ram[15] = stringToByte("00000000")
-
+func runVM() {
 	for {
 		clearScreen()
 		printState()
@@ -214,14 +138,71 @@ func main() {
 	printState()
 }
 
+func assemble(hopAsm []string) []byte {
+	asmCodes := map[string]opCodeDescriptor{} // reverse lookup map from ASMCODE->OPCODE
+	for opCode, opCodeDesc := range opCodes {
+		opCodeDesc.opCode = opCode
+		asmCodes[opCodeDesc.asm] = opCodeDesc
+	}
+
+	machineCode := make([]byte, len(hopAsm))
+	for idx, asmInstruction := range hopAsm {
+		var machineInstruction byte
+		commentPos := strings.Index(asmInstruction, ";")
+		if commentPos != -1 {
+			asmInstruction = strings.Trim(asmInstruction[0:commentPos], " ")
+		}
+
+		asmCode := asmInstruction
+		asmOperand := ""
+		spacePos := strings.Index(asmInstruction, " ")
+		if spacePos != -1 {
+			asmCode = asmInstruction[0:spacePos]
+			asmOperand = asmInstruction[spacePos+1:]
+		}
+
+		if opCodeDesc, isOpCode := asmCodes[asmCode]; isOpCode {
+			if asmOperand == "" {
+				machineInstruction = opCodeDesc.opCode << 4 // move the OPCODE to MSB
+			} else {
+				opOperandAsInt, _ := strconv.ParseUint(asmOperand, 10, 8)
+				opOperandAsByte := byte(opOperandAsInt)
+
+				machineInstruction = opCodeDesc.opCode << 4 // move the OPCODE to MSB
+				machineInstruction ^= opOperandAsByte       // set the LSB to the operand value
+			}
+		} else {
+			// treat as memory value, convert to byte
+			instructionAsByte, _ := strconv.ParseUint(asmInstruction, 10, 8)
+			machineInstruction = byte(instructionAsByte)
+		}
+
+		machineCode[idx] = machineInstruction
+	}
+
+	return machineCode
+}
+
+func main() {
+	if len(os.Args) < 3 {
+		printUsageAndDie()
+	}
+
+	if os.Args[1] == "run" {
+		binContents, _ := ioutil.ReadFile(os.Args[2])
+		copy(ram[:], binContents)
+		runVM()
+	} else if os.Args[1] == "assemble" {
+		hopContents, _ := ioutil.ReadFile(os.Args[2])
+		machineCode := assemble(strings.Split(string(hopContents), "\n"))
+		ioutil.WriteFile(os.Args[2]+".bin", machineCode, 0644)
+	} else {
+		printUsageAndDie()
+	}
+}
+
 /*
 TODO:
 - control clock with a command line (maybe even have a manual step)
 - show the actual command in text form of the command the PC counter is pointing to
 */
-
-func clearScreen() {
-	c := exec.Command("clear")
-	c.Stdout = os.Stdout
-	c.Run()
-}
