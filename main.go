@@ -7,29 +7,69 @@ import (
 	"strconv"
 )
 
-// Operations use the first 4 bits as the Op Code. The last 4 bits are operation specific.
-const (
-	// A no operation.
-	opNoop byte = 0
-	// Loads contents of ADDR to A.
-	// 0 0 0 1 A D D R
-	opLoda byte = 1
-	// Loads contents of ADDR to B.
-	// 0 0 1 0 A D D R
-	opLodb byte = 2
-	// Increment value of ADDR.
-	// 0 0 1 1 A D D R
-	opIncr byte = 3
-	// Subtracts B from A and stores in ADDR (ram[ADDR]=A-B).
-	// 0 1 0 0 A D D R
-	opSubt byte = 4
-	// Move PC to ADDR if flag register is flagPositive.
-	// 0 1 0 1 A D D R
-	opJmpp byte = 5
-	// Halt the VM.
-	// 0 1 1 0 _ _ _ _
-	opHalt byte = 6
-)
+// opCodeDescriptor describe a Hopper OPCODE. It holds information for the Hopper assembler to know
+// how to translate Hopper Assembly to OPCODEs.
+type opCodeDescriptor struct {
+	// The string (or ASM) version of this OPCODE.
+	asm string
+	// Indicates wether this OPCODE has any operands.
+	noOperand bool
+	// The function that will execute the OPCODE.
+	executor func(operand byte) (result byte, exitVM bool, incrementPC bool)
+}
+
+// opCodes holds all supported OPCODEs in Hopper VM.
+var opCodes = map[byte]opCodeDescriptor{
+	0: opCodeDescriptor{
+		asm:       "NOOP",
+		noOperand: true,
+		executor:  func(operand byte) (byte, bool, bool) { return 0, false, true },
+	},
+	1: opCodeDescriptor{
+		asm: "LODA",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			registerA = ram[operand]
+			return registerA, false, true
+		},
+	},
+	2: opCodeDescriptor{
+		asm: "LODB",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			registerB = ram[operand]
+			return registerB, false, true
+		},
+	},
+	3: opCodeDescriptor{
+		asm: "INCR",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			ram[operand]++
+			return 0, false, true
+		},
+	},
+	4: opCodeDescriptor{
+		asm: "SUBT",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			result = registerA - registerB
+			ram[operand] = result
+			return result, false, true
+		},
+	},
+	5: opCodeDescriptor{
+		asm: "JMPP",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			if flagRegister == flagPositive {
+				pc = operand
+				return 0, false, false
+			}
+			return 0, false, true
+		},
+	},
+	6: opCodeDescriptor{
+		asm:       "HALT",
+		noOperand: true,
+		executor:  func(_ byte) (result byte, exitVM bool, incrementPC bool) { return 0, true, false },
+	},
+}
 
 /*
 TODO: Possible instructions (* already implemented)
@@ -121,16 +161,6 @@ func printState() {
 	}
 }
 
-func updateFlagRegister(result byte) {
-	if result == 0 {
-		flagRegister = flagZero
-	} else if isBitSet(result, 8) {
-		flagRegister = flagNegative
-	} else {
-		flagRegister = flagPositive
-	}
-}
-
 func main() {
 	// the count_to_three.hop
 	ram[0] = stringToByte("00111100")
@@ -160,49 +190,23 @@ func main() {
 		// Op codes are defined in the first 4 bits, shifting the instruction by 4 bits to the right
 		// gives us the op code only without arguments.
 		opCode := instruction >> 4
-		opArgument := clearMsb(instruction)
+		opOperand := clearMsb(instruction)
 
-		doExit := false
-		incrementPc := true
-		switch opCode {
-		case opLoda:
-			registerA = ram[opArgument]
-			updateFlagRegister(registerA)
-
-		case opLodb:
-			registerB = ram[opArgument]
-			updateFlagRegister(registerB)
-
-		case opIncr:
-			ram[opArgument]++
-			updateFlagRegister(0)
-
-		case opSubt:
-			result := registerA - registerB
-			ram[opArgument] = result
-			updateFlagRegister(result)
-
-		case opJmpp:
-			if flagRegister == flagPositive {
-				incrementPc = false
-				pc = opArgument
-				updateFlagRegister(pc)
-			}
-
-		case opHalt:
-			doExit = true
-
-		default:
-			panic("Unknown instruction")
+		result, exitVM, incrementPC := opCodes[opCode].executor(opOperand)
+		if result == 0 {
+			flagRegister = flagZero
+		} else if isBitSet(result, 8) {
+			flagRegister = flagNegative
+		} else {
+			flagRegister = flagPositive
 		}
 
-		// JMP ops can manually set the pc
-		if incrementPc {
-			pc++
-		}
-
-		if doExit {
+		if exitVM {
 			break
+		}
+
+		if incrementPC {
+			pc++
 		}
 	}
 
@@ -213,8 +217,6 @@ func main() {
 /*
 TODO:
 - control clock with a command line (maybe even have a manual step)
-- show contents of all registers in binary and hex mode
-- show ram +/- a couple of locations around the current PC counter
 - show the actual command in text form of the command the PC counter is pointing to
 */
 
