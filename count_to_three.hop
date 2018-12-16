@@ -1,7 +1,7 @@
-INC  12 ; increment address 12 by 1
+INCR 12 ; increment address 12 by 1
 LODA 13 ; load address 13 into A
 LODB 12 ; load address 12 into B
-SUB  14 ; A-B -> address 14
+SUBT 14 ; A-B -> address 14
 JMPP 0  ; jum to address 0 if ^ was positive
 HALT    ; else halt the program
 NOOP
