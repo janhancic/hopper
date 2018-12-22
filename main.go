@@ -15,8 +15,6 @@ type opCodeDescriptor struct {
 	asm string
 	// The OPCODE. This will not be populated in the opCodes, only in the assembling stage.
 	opCode byte
-	// Indicates wether this OPCODE has any operands.
-	noOperand bool
 	// The function that will execute the OPCODE.
 	executor func(operand byte) (result byte, exitVM bool, incrementPC bool)
 }
@@ -24,9 +22,8 @@ type opCodeDescriptor struct {
 // opCodes holds all supported OPCODEs in Hopper VM. The key is the OPCODE's binary representation.
 var opCodes = map[byte]opCodeDescriptor{
 	0: opCodeDescriptor{
-		asm:       "NOOP",
-		noOperand: true,
-		executor:  func(operand byte) (byte, bool, bool) { return 0, false, true },
+		asm:      "NOOP",
+		executor: func(operand byte) (byte, bool, bool) { return 0, false, true },
 	},
 	1: opCodeDescriptor{
 		asm: "LODA",
@@ -68,9 +65,8 @@ var opCodes = map[byte]opCodeDescriptor{
 		},
 	},
 	6: opCodeDescriptor{
-		asm:       "HALT",
-		noOperand: true,
-		executor:  func(_ byte) (result byte, exitVM bool, incrementPC bool) { return 0, true, false },
+		asm:      "HALT",
+		executor: func(_ byte) (result byte, exitVM bool, incrementPC bool) { return 0, true, false },
 	},
 }
 
