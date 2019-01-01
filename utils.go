@@ -42,9 +42,10 @@ func clearMsb(b byte) byte {
 // prints the current state of the VM
 func printState() {
 	fmt.Printf("Register A:    %s (%d)\n", byteToString(registerA), registerA)
-	fmt.Printf("Register B:    %s (%d)\n", byteToString(registerB), registerB)
-	fmt.Printf("Flag Register: %s (%d)\n", byteToString(flagRegister), flagRegister)
-	fmt.Printf("PC:            %s (%d)\n", byteToString(pc), pc)
+	fmt.Printf("Register Out:  %s (%d)\n", byteToString(registerOut), registerOut)
+	fmt.Printf("Flag Zero:     %v\n", flagZeroRegister)
+	fmt.Printf("Flag Carry:    %v\n", flagCarryRegister)
+	fmt.Printf("PC:            %s (%d)\n", byteToNibble(pc), pc)
 	fmt.Println("RAM:")
 	for addr, val := range ram {
 		pcIndicator := ""
@@ -53,7 +54,7 @@ func printState() {
 		}
 		fmt.Printf(
 			"%02d: %s: %s%s\n",
-			addr+1,
+			addr,
 			byteToNibble(byte(addr)),
 			byteToString(val),
 			pcIndicator,

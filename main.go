@@ -12,9 +12,11 @@ import (
 // how to translate Hopper Assembly to OPCODEs.
 type opCodeDescriptor struct {
 	// The string (or ASM) version of this OPCODE.
-	asm string
+	mnemonic string
 	// The OPCODE. This will not be populated in the opCodes, only in the assembling stage.
 	opCode byte
+	// Indicates if the flag registers should be updated with the result of the executor.
+	useResult bool
 	// The function that will execute the OPCODE.
 	executor func(operand byte) (result byte, exitVM bool, incrementPC bool)
 }
@@ -22,77 +24,96 @@ type opCodeDescriptor struct {
 // opCodes holds all supported OPCODEs in Hopper VM. The key is the OPCODE's binary representation.
 var opCodes = map[byte]opCodeDescriptor{
 	0: opCodeDescriptor{
-		asm:      "NOOP",
+		mnemonic: "NOP",
 		executor: func(operand byte) (byte, bool, bool) { return 0, false, true },
 	},
 	1: opCodeDescriptor{
-		asm: "LODA",
+		mnemonic: "LDA",
 		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
 			registerA = ram[operand]
-			return registerA, false, true
-		},
-	},
-	2: opCodeDescriptor{
-		asm: "LODB",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
-			registerB = ram[operand]
-			return registerB, false, true
-		},
-	},
-	3: opCodeDescriptor{
-		asm: "INCR",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
-			ram[operand]++
 			return 0, false, true
 		},
 	},
-	4: opCodeDescriptor{
-		asm: "SUBT",
+	2: opCodeDescriptor{
+		mnemonic:  "ADD",
+		useResult: true,
 		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
-			result = registerA - registerB
-			ram[operand] = result
-			return result, false, true
+			registerA = registerA + ram[operand]
+			return registerA, false, true
+		},
+	},
+	3: opCodeDescriptor{
+		mnemonic:  "SUB",
+		useResult: true,
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			registerA = registerA - ram[operand]
+			return registerA, false, true
+		},
+	},
+	4: opCodeDescriptor{
+		mnemonic: "STR",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			ram[operand] = registerA
+			return 0, false, true
 		},
 	},
 	5: opCodeDescriptor{
-		asm: "JMPP",
+		mnemonic: "LDI",
 		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
-			if flagRegister == flagPositive {
+			registerA = operand
+			return 0, false, true
+		},
+	},
+	6: opCodeDescriptor{
+		mnemonic: "JMP",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			pc = operand
+			return 0, false, false
+		},
+	},
+	7: opCodeDescriptor{
+		mnemonic: "JC",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			if flagCarryRegister {
 				pc = operand
 				return 0, false, false
 			}
 			return 0, false, true
 		},
 	},
-	6: opCodeDescriptor{
-		asm:      "HALT",
-		executor: func(_ byte) (result byte, exitVM bool, incrementPC bool) { return 0, true, false },
+	8: opCodeDescriptor{
+		mnemonic: "JZ",
+		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+			if flagZeroRegister {
+				pc = operand
+				return 0, false, false
+			}
+			return 0, false, true
+		},
+	},
+	// Other OP codes are reserved.
+	14: opCodeDescriptor{
+		mnemonic: "OUT",
+		executor: func(_ byte) (result byte, exitVM bool, incrementPC bool) {
+			registerOut = registerA
+			return 0, false, true
+		},
+	},
+	15: opCodeDescriptor{
+		mnemonic: "HLT",
+		executor: func(_ byte) (result byte, exitVM bool, incrementPC bool) { return 0, true, true },
 	},
 }
 
-/*
-TODO: Possible future instructions
-SAVE A ADDR
-SAVE B ADDR
-ADD  ADDR ; Add ADDR=A+B
-JMP  ADDR ; Jump to ADDR
-JMPZ ADDR ; Jump to ADDR if flagRegister is zero
-JMPN ADDR ; Jump to ADDR if flagRegister is negative
-*/
-
-// Flags for the flagRegister.
-const (
-	flagZero     = 0
-	flagPositive = 1
-	flagNegative = 2
-)
-
 var (
-	// Two general purpose registers.
+	// General purpose register. In the real computer there is also a register B, but we don't need
+	// it in the VM.
 	registerA byte
-	registerB byte
+	// The output register.
+	registerOut byte
 	// Indicates the result of the last operation.
-	flagRegister byte
+	flagZeroRegister  bool
+	flagCarryRegister bool
 	// The working memory for the VM.
 	ram [16]byte
 	// Program counter.
@@ -113,20 +134,22 @@ func runVM() {
 		opOperand := clearMsb(instruction)
 
 		result, exitVM, incrementPC := opCodes[opCode].executor(opOperand)
-		if result == 0 {
-			flagRegister = flagZero
-		} else if isBitSet(result, 8) {
-			flagRegister = flagNegative
-		} else {
-			flagRegister = flagPositive
-		}
-
-		if exitVM {
-			break
+		if opCodes[opCode].useResult {
+			flagZeroRegister = false
+			flagCarryRegister = false
+			if result == 0 {
+				flagZeroRegister = true
+			} else if isBitSet(result, 8) {
+				flagCarryRegister = true
+			}
 		}
 
 		if incrementPC {
 			pc++
+		}
+
+		if exitVM {
+			break
 		}
 	}
 
@@ -135,10 +158,10 @@ func runVM() {
 }
 
 func assemble(hopAsm []string) []byte {
-	asmCodes := map[string]opCodeDescriptor{} // reverse lookup map from ASMCODE->OPCODE
+	mnemonicCodes := map[string]opCodeDescriptor{} // reverse lookup map from mnemonic->OPCODE
 	for opCode, opCodeDesc := range opCodes {
 		opCodeDesc.opCode = opCode
-		asmCodes[opCodeDesc.asm] = opCodeDesc
+		mnemonicCodes[opCodeDesc.mnemonic] = opCodeDesc
 	}
 
 	machineCode := make([]byte, len(hopAsm))
@@ -157,7 +180,7 @@ func assemble(hopAsm []string) []byte {
 			asmOperand = asmInstruction[spacePos+1:]
 		}
 
-		if opCodeDesc, isOpCode := asmCodes[asmCode]; isOpCode {
+		if opCodeDesc, isOpCode := mnemonicCodes[asmCode]; isOpCode {
 			if asmOperand == "" {
 				machineInstruction = opCodeDesc.opCode << 4 // move the OPCODE to MSB
 			} else {

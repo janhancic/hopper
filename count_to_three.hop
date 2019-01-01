@@ -1,16 +1,16 @@
-INCR 12 ; increment address 12 by 1
-LODA 13 ; load address 13 into A
-LODB 12 ; load address 12 into B
-SUBT 14 ; A-B -> address 14
-JMPP 0  ; jum to address 0 if ^ was positive
-HALT    ; else halt the program
-NOOP
-NOOP
-NOOP
-NOOP
-NOOP
-NOOP
-0       ; value we will be incrementing
-3       ; once we reach 3 we will stop
-0       ; not needed, but result of SUB will be written here
-NOOP
+LDI 0  ; load "0" to A
+ADD 14 ; add value of address 14 to A and store in A
+STR 13 ; store A in address 13
+SUB 15 ; subtract value of address 15 from A
+LDA 13 ; load our result back into A
+JZ 7   ; jump to address 7 if we have countet to 3
+JMP 1  ; otherwise do the loop again
+OUT    ; output the result
+HLT    ; stop
+NOP
+NOP
+NOP
+NOP
+0 ; our result
+1 ; increment by this value
+3 ; our limit
