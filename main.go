@@ -140,6 +140,8 @@ func runVM() {
 			if result == 0 {
 				flagZeroRegister = true
 			} else if isBitSet(result, 8) {
+				// TODO: This doesn't actually work. Needs a different carry detection logic.
+				//       Perhaps: https://github.com/JohnCGriffin/overflow/blob/master/overflow_impl.go#L13
 				flagCarryRegister = true
 			}
 		}
