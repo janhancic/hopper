@@ -39,6 +39,24 @@ func clearMsb(b byte) byte {
 	return b &^ msbMask
 }
 
+// adds two bytes together and returns the result and if an overflow occurred (carry)
+func byteAdder(a, b byte) (result byte, carry bool) {
+	c := a + b
+	if (c > a) == (b > 0) {
+		return c, false
+	}
+	return c, true
+}
+
+// subtracts two bytes and returns the result and if an overflow occurred (carry)
+func byteSubtractor(a, b byte) (result byte, carry bool) {
+	c := a - b
+	if (c < a) == (b > 0) {
+		return c, true
+	}
+	return c, false
+}
+
 // prints the current state of the VM
 func printState() {
 	fmt.Printf("Register A:    %s (%d)\n", byteToString(registerA), registerA)

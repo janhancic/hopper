@@ -15,93 +15,99 @@ type opCodeDescriptor struct {
 	mnemonic string
 	// The OPCODE. This will not be populated in the opCodes, only in the assembling stage.
 	opCode byte
-	// Indicates if the flag registers should be updated with the result of the executor.
-	useResult bool
 	// The function that will execute the OPCODE.
-	executor func(operand byte) (result byte, exitVM bool, incrementPC bool)
+	executor func(operand byte) (exitVM bool, incrementPC bool)
 }
 
 // opCodes holds all supported OPCODEs in Hopper VM. The key is the OPCODE's binary representation.
 var opCodes = map[byte]opCodeDescriptor{
 	0: opCodeDescriptor{
 		mnemonic: "NOP",
-		executor: func(operand byte) (byte, bool, bool) { return 0, false, true },
+		executor: func(operand byte) (bool, bool) { return false, true },
 	},
 	1: opCodeDescriptor{
 		mnemonic: "LDA",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
 			registerA = ram[operand]
-			return 0, false, true
+			return false, true
 		},
 	},
 	2: opCodeDescriptor{
-		mnemonic:  "ADD",
-		useResult: true,
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
-			registerA = registerA + ram[operand]
-			return registerA, false, true
+		mnemonic: "ADD",
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
+			result, carry := byteAdder(registerA, ram[operand])
+
+			registerA = result
+			flagCarryRegister = carry
+			flagZeroRegister = result == 0
+
+			return false, true
 		},
 	},
 	3: opCodeDescriptor{
-		mnemonic:  "SUB",
-		useResult: true,
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
-			registerA = registerA - ram[operand]
-			return registerA, false, true
+		mnemonic: "SUB",
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
+			result, carry := byteSubtractor(registerA, ram[operand])
+
+			registerA = result
+			flagCarryRegister = carry
+			flagZeroRegister = result == 0
+
+			return false, true
 		},
 	},
 	4: opCodeDescriptor{
 		mnemonic: "STR",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
 			ram[operand] = registerA
-			return 0, false, true
+			return false, true
 		},
 	},
 	5: opCodeDescriptor{
 		mnemonic: "LDI",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
 			registerA = operand
-			return 0, false, true
+			return false, true
 		},
 	},
 	6: opCodeDescriptor{
 		mnemonic: "JMP",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
 			pc = operand
-			return 0, false, false
+			return false, false
 		},
 	},
 	7: opCodeDescriptor{
 		mnemonic: "JC",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
 			if flagCarryRegister {
 				pc = operand
-				return 0, false, false
+				return false, false
 			}
-			return 0, false, true
+			return false, true
 		},
 	},
 	8: opCodeDescriptor{
 		mnemonic: "JZ",
-		executor: func(operand byte) (result byte, exitVM bool, incrementPC bool) {
+		executor: func(operand byte) (exitVM bool, incrementPC bool) {
 			if flagZeroRegister {
 				pc = operand
-				return 0, false, false
+				return false, false
 			}
-			return 0, false, true
+			return false, true
 		},
 	},
 	// Other OP codes are reserved.
 	14: opCodeDescriptor{
 		mnemonic: "OUT",
-		executor: func(_ byte) (result byte, exitVM bool, incrementPC bool) {
+		executor: func(_ byte) (exitVM bool, incrementPC bool) {
 			registerOut = registerA
-			return 0, false, true
+			return false, true
 		},
 	},
 	15: opCodeDescriptor{
 		mnemonic: "HLT",
-		executor: func(_ byte) (result byte, exitVM bool, incrementPC bool) { return 0, true, true },
+		executor: func(_ byte) (exitVM bool, incrementPC bool) { return true, true },
 	},
 }
 
@@ -133,18 +139,7 @@ func runVM() {
 		opCode := instruction >> 4
 		opOperand := clearMsb(instruction)
 
-		result, exitVM, incrementPC := opCodes[opCode].executor(opOperand)
-		if opCodes[opCode].useResult {
-			flagZeroRegister = false
-			flagCarryRegister = false
-			if result == 0 {
-				flagZeroRegister = true
-			} else if isBitSet(result, 8) {
-				// TODO: This doesn't actually work. Needs a different carry detection logic.
-				//       Perhaps: https://github.com/JohnCGriffin/overflow/blob/master/overflow_impl.go#L13
-				flagCarryRegister = true
-			}
-		}
+		exitVM, incrementPC := opCodes[opCode].executor(opOperand)
 
 		if incrementPC {
 			pc++
