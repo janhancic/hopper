@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // opCodeDescriptor describe a Hopper OPCODE. It holds information for the Hopper assembler to know
@@ -126,12 +127,21 @@ var (
 	pc byte
 )
 
-func runVM() {
+func runVM(stepDelay float64) {
+	var sleepTime time.Duration
+	if stepDelay != 0 {
+		parsedSleepTime, _ := time.ParseDuration(fmt.Sprintf("%vs", stepDelay))
+		sleepTime = parsedSleepTime
+	}
 	for {
 		clearScreen()
 		printState()
-		fmt.Printf("Press enter to advance program.")
-		fmt.Scanln()
+		if stepDelay == 0 {
+			fmt.Printf("Press enter to advance program.")
+			fmt.Scanln()
+		} else {
+			time.Sleep(sleepTime)
+		}
 
 		instruction := ram[pc]
 		// Op codes are defined in the first 4 bits, shifting the instruction by 4 bits to the right
@@ -207,7 +217,16 @@ func main() {
 	if os.Args[1] == "run" {
 		binContents, _ := ioutil.ReadFile(os.Args[2])
 		copy(ram[:], binContents)
-		runVM()
+		clockSpeed := float64(0)
+		if len(os.Args) == 4 {
+			hz, err := strconv.ParseFloat(os.Args[3], 64)
+			if err != nil {
+				panic(err)
+			}
+			clockSpeed = 1 / hz
+			fmt.Println(clockSpeed)
+		}
+		runVM(clockSpeed)
 	} else if os.Args[1] == "assemble" {
 		hopContents, _ := ioutil.ReadFile(os.Args[2])
 		machineCode := assemble(strings.Split(string(hopContents), "\n"))
@@ -219,6 +238,5 @@ func main() {
 
 /*
 TODO:
-- control clock with a command line (maybe even have a manual step)
 - show the actual command in text form of the command the PC counter is pointing to
 */

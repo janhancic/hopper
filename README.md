@@ -14,6 +14,9 @@ To assemble a .hop file (Hopper Assembly) into an executable run `go run *.go as
 
 Then run the program with `go run *.go run program.hop.bin`. 
 
+You can also pass the clock frequency (in Hz) with which the VM will run. This will make the program
+advance automatically.
+
 ## Notes on code
 A lot of the code is very simplistic and lacks error handling. This is on purpose. The project is
 not meant to be used for anything serious. It is purely a learning tool. The subject here is VMs,
