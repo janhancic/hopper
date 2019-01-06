@@ -1,2 +1,6 @@
 *.bin
 .vscode
+
+# exclude the build programs
+vm/vm
+assembler/assembler
