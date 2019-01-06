@@ -11,12 +11,6 @@ import (
 )
 
 func assemble(hopAsm []string) []byte {
-	mnemonicCodes := map[string]opcodes.OpCodeDescriptor{} // reverse lookup map from mnemonic->OPCODE
-	for opCode, opCodeDesc := range opcodes.OpCodes {
-		opCodeDesc.OpCode = opCode
-		mnemonicCodes[opCodeDesc.Mnemonic] = opCodeDesc
-	}
-
 	machineCode := make([]byte, len(hopAsm))
 	for idx, asmInstruction := range hopAsm {
 		var machineInstruction byte
@@ -33,15 +27,15 @@ func assemble(hopAsm []string) []byte {
 			asmOperand = asmInstruction[spacePos+1:]
 		}
 
-		if opCodeDesc, isOpCode := mnemonicCodes[asmCode]; isOpCode {
+		if opCode, isOpCode := opcodes.MnemonicOpCodes[asmCode]; isOpCode {
 			if asmOperand == "" {
-				machineInstruction = opCodeDesc.OpCode << 4 // move the OPCODE to MSB
+				machineInstruction = byte(opCode) << 4 // move the OPCODE to MSB
 			} else {
 				opOperandAsInt, _ := strconv.ParseUint(asmOperand, 10, 8)
 				opOperandAsByte := byte(opOperandAsInt)
 
-				machineInstruction = opCodeDesc.OpCode << 4 // move the OPCODE to MSB
-				machineInstruction ^= opOperandAsByte       // set the LSB to the operand value
+				machineInstruction = byte(opCode) << 4 // move the OPCODE to MSB
+				machineInstruction ^= opOperandAsByte  // set the LSB to the operand value
 			}
 		} else {
 			// treat as memory value, convert to byte

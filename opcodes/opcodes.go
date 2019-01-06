@@ -1,53 +1,71 @@
+// Package opcodes defines all the supported operation codes in a Hopper architecture.
 package opcodes
 
-// TODO: This package needs to be rewritten, right now it's tied too much to all users of it.
+// OpCode represents a Hopper supported operation code.
+type OpCode byte
 
-// OpCodeDescriptor describe a Hopper OPCODE. It holds information for the Hopper assembler to know
-// how to translate Hopper Assembly to OPCODEs.
-type OpCodeDescriptor struct {
-	// The string (or ASM) version of this OPCODE.
-	Mnemonic string
-	// The OPCODE. This will not be populated in the opCodes, only in the assembling stage.
-	OpCode byte
-	// The function that will execute the OPCODE.
-	Executor func(operand byte) (exitVM bool, incrementPC bool)
+// NOP  does nothing. It has no operands. 0000
+var NOP OpCode
+
+// LDA stores the value addressed by its operand into register A. 0001
+var LDA OpCode = 1
+
+// ADD adds the value addressed by its operand and the value in register A together. It stores the
+// result in register A. 0010
+var ADD OpCode = 2
+
+// SUB subtracts the value addressed by its operand from the value in register A. It stores the
+// result in register A. 0011
+var SUB OpCode = 3
+
+// STR stores the value addressed by its operand in register A. 0100
+var STR OpCode = 4
+
+// LDI stores the operand in register A. 0101
+var LDI OpCode = 5
+
+// JMP jumps to the address specified in the operand. 0110
+var JMP OpCode = 6
+
+// JC jumps to the address specified in the operand if the result of the last operation resulted in
+// a carry bit. 0111
+var JC OpCode = 7
+
+// JZ jumps to the address specified in the operand if the result of the last operation was 0. 1000
+var JZ OpCode = 8
+
+// OUT puts the value of register A into the Out register. 1110
+var OUT OpCode = 14
+
+// HLT halts the execution of the computer. 1111
+var HLT OpCode = 15
+
+// OpCodeMnemonics is a convenience map of OpCode->mnemonic for easy lookups.
+var OpCodeMnemonics = map[OpCode]string{
+	NOP: "NOP",
+	LDA: "LDA",
+	ADD: "ADD",
+	SUB: "SUB",
+	STR: "STR",
+	LDI: "LDI",
+	JMP: "JMP",
+	JC:  "JC",
+	JZ:  "JZ",
+	OUT: "OUT",
+	HLT: "HLT",
 }
 
-// OpCodes holds all supported Hopper operation codes.
-// The key is the opcode's binary representation.
-var OpCodes = map[byte]*OpCodeDescriptor{
-	0: &OpCodeDescriptor{
-		Mnemonic: "NOP",
-	},
-	1: &OpCodeDescriptor{
-		Mnemonic: "LDA",
-	},
-	2: &OpCodeDescriptor{
-		Mnemonic: "ADD",
-	},
-	3: &OpCodeDescriptor{
-		Mnemonic: "SUB",
-	},
-	4: &OpCodeDescriptor{
-		Mnemonic: "STR",
-	},
-	5: &OpCodeDescriptor{
-		Mnemonic: "LDI",
-	},
-	6: &OpCodeDescriptor{
-		Mnemonic: "JMP",
-	},
-	7: &OpCodeDescriptor{
-		Mnemonic: "JC",
-	},
-	8: &OpCodeDescriptor{
-		Mnemonic: "JZ",
-	},
-	// Other OP codes are reserved.
-	14: &OpCodeDescriptor{
-		Mnemonic: "OUT",
-	},
-	15: &OpCodeDescriptor{
-		Mnemonic: "HLT",
-	},
+// MnemonicOpCodes is a convenience map of mnemonic->OpCode for easy lookups.
+var MnemonicOpCodes = map[string]OpCode{
+	"NOP": NOP,
+	"LDA": LDA,
+	"ADD": ADD,
+	"SUB": SUB,
+	"STR": STR,
+	"LDI": LDI,
+	"JMP": JMP,
+	"JC":  JC,
+	"JZ":  JZ,
+	"OUT": OUT,
+	"HLT": HLT,
 }

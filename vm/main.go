@@ -11,16 +11,16 @@ import (
 	"github.com/janhancic/hopper/utils"
 )
 
-func init() {
-	// NOP
-	opcodes.OpCodes[0].Executor = func(operand byte) (bool, bool) { return false, true }
-	// LDA
-	opcodes.OpCodes[1].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+// Executes the operation code in the computer.
+type opExecutor = func(operand byte) (exitVM bool, incrementPC bool)
+
+var opCodeExecutors = map[opcodes.OpCode]opExecutor{
+	opcodes.NOP: func(operand byte) (bool, bool) { return false, true },
+	opcodes.LDA: func(operand byte) (exitVM bool, incrementPC bool) {
 		registerA = ram[operand]
 		return false, true
-	}
-	// ADD
-	opcodes.OpCodes[2].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.ADD: func(operand byte) (exitVM bool, incrementPC bool) {
 		result, carry := utils.ByteAdder(registerA, ram[operand])
 
 		registerA = result
@@ -28,9 +28,8 @@ func init() {
 		flagZeroRegister = result == 0
 
 		return false, true
-	}
-	// SUB
-	opcodes.OpCodes[3].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.SUB: func(operand byte) (exitVM bool, incrementPC bool) {
 		result, carry := utils.ByteSubtractor(registerA, ram[operand])
 
 		registerA = result
@@ -38,45 +37,38 @@ func init() {
 		flagZeroRegister = result == 0
 
 		return false, true
-	}
-	// STR
-	opcodes.OpCodes[4].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.STR: func(operand byte) (exitVM bool, incrementPC bool) {
 		ram[operand] = registerA
 		return false, true
-	}
-	// LDI
-	opcodes.OpCodes[5].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.LDI: func(operand byte) (exitVM bool, incrementPC bool) {
 		registerA = operand
 		return false, true
-	}
-	// JMP
-	opcodes.OpCodes[6].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.JMP: func(operand byte) (exitVM bool, incrementPC bool) {
 		pc = operand
 		return false, false
-	}
-	// JC
-	opcodes.OpCodes[7].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.JC: func(operand byte) (exitVM bool, incrementPC bool) {
 		if flagCarryRegister {
 			pc = operand
 			return false, false
 		}
 		return false, true
-	}
-	// JZ
-	opcodes.OpCodes[8].Executor = func(operand byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.JZ: func(operand byte) (exitVM bool, incrementPC bool) {
 		if flagZeroRegister {
 			pc = operand
 			return false, false
 		}
 		return false, true
-	}
-	// OUT
-	opcodes.OpCodes[14].Executor = func(_ byte) (exitVM bool, incrementPC bool) {
+	},
+	opcodes.OUT: func(_ byte) (exitVM bool, incrementPC bool) {
 		registerOut = registerA
 		return false, true
-	}
-	// HLT
-	opcodes.OpCodes[15].Executor = func(_ byte) (exitVM bool, incrementPC bool) { return true, true }
+	},
+	opcodes.HLT: func(_ byte) (exitVM bool, incrementPC bool) { return true, true },
 }
 
 var (
@@ -116,7 +108,7 @@ func runVM(stepDelay float64) {
 		opCode := instruction >> 4
 		opOperand := utils.ClearMsb(instruction)
 
-		exitVM, incrementPC := opcodes.OpCodes[opCode].Executor(opOperand)
+		exitVM, incrementPC := opCodeExecutors[opcodes.OpCode(opCode)](opOperand)
 
 		if incrementPC {
 			pc++
