@@ -35,10 +35,10 @@ how to use it. There is an overview of all of them below.
 ## Programs in this repository
 
 ### Hopper Virtual Machine
-Contained in the `vm` folder. A 8bit Virtual Machine that virtualises a Hopper computer.
+Contained in the `vm` folder. An 8bit Virtual Machine that virtualises a Hopper computer.
 
 ### Hopper Hardware Emulator
-TODO
+Contained in the `emulator` folder. An 8bit emulator that emulates a Hopper computer.
 
 ### Hopper Assembler
 Contained in the `assembler` folder. A simple assembler that assembles .hop files into binary files
