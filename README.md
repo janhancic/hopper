@@ -35,13 +35,14 @@ how to use it. There is an overview of all of them below.
 ## Programs in this repository
 
 ### Hopper Virtual Machine
-Contained in the `vm` folder. It contains a 8bit Virtual Machine that virtualises a Hopper computer.
+Contained in the `vm` folder. A 8bit Virtual Machine that virtualises a Hopper computer.
 
 ### Hopper Hardware Emulator
 TODO
 
 ### Hopper Assembler
-TODO
+Contained in the `assembler` folder. A simple assembler that assembles .hop files into binary files
+that can be run with the VM or the emulator.
 
 ## Hopper Architecture
 At the moment Hopper uses the same architecture as [Ben Eater](https://eater.net/)'s
