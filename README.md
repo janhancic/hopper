@@ -13,6 +13,7 @@ The current plan is roughly as follows:
 available memory
 - design the computer in some sort of circuit design&simulate software (most likely in
 [Logisim](http://www.cburch.com/logisim/) or [Digital](https://github.com/hneemann/Digital))
+- build the computer on a real breadboard
 - explore [PCBs](https://en.wikipedia.org/wiki/Printed_circuit_board) and
 [FPGAs](https://en.wikipedia.org/wiki/Field-programmable_gate_array)
 
